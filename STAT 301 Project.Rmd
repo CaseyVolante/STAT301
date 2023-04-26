@@ -1,0 +1,98 @@
+---
+title: "STAT 301 Project"
+author: "Casey Volante"
+date: "2023-04-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Question 1: "For 1991 to 2017, does the mean amount of recycled waste differ significantly from the amount of landfilled waste for Hennepin, Ramsey, and Dakota counties?"
+
+#Call needed libraries: tidyverse for data wrangling, nlme and multcomp for analysis
+library(tidyverse)
+library(nlme)
+library(multcomp)
+
+#Gather data to make tons of recycling the dependent variable and type of waste an independent variable
+Waste<-Wastedata2%>%gather(key="Type",value="Tons",3:7)
+#Filter data to only include Hennepin, Ramsey, and Dakota counties and recycling and landfilled types of waste
+WasteLocal<-Waste%>%filter(County == "Hennepin" | County == "Ramsey" | County == "Dakota")
+WasteLocalRL<-WasteLocal%>%filter(Type == "Recycling" | Type == "Landfilled")
+
+#Make sure county and waste type variables are being read as factors
+WasteLocalRL$County<-as.factor(WasteLocalRL$County)
+WasteLocalRL$Type<-as.factor(WasteLocalRL$Type)
+
+#Perform Two-Way fixed measure ANOVA analysis
+Model1<-lme(Tons~County+Type+County:Type, random=~1 | Year, data=WasteLocalRL)
+anova(Model1)
+
+#County is significant (p < 0.0001), type of waste is barely not significant (p = 0.0526 > 0.05), but there is a significant interaction between county and type of waste (p = 0.0043).
+
+#Perform Tukey comparisons
+posthoc1<-glht(Model1,linfct=mcp(County="Tukey"))
+summary(posthoc1)
+
+#All counties are significantly different from each other. p-value = 0.03 for Ramsey and Dakota, p < 0.001 for Hennepin and both Ramsey and Dakota.
+
+#Use paired t-tests to test the difference between means of the two types of waste for each County
+#Use ggplot function to visualize the difference between means
+
+#Hennepin County
+WasteHennepin<-WasteLocalRL%>%filter(County == "Hennepin")
+t.test(Tons~Type, data=WasteHennepin, alternative = "two.sided", paired=TRUE)
+
+WasteHennepin%>%
+  group_by(Type)%>%
+  summarize(aveTons=mean(Tons),seTons=sd(Tons)/sqrt(length(Tons)),tstar=qt(0.95,length(Tons)-1))%>%
+  ggplot(aes(x=Type,y=aveTons))+geom_bar(stat="identity",fill="purple")+geom_errorbar(aes(ymin=aveTons-seTons*tstar,ymax=aveTons+seTons*tstar))+labs(x="Type of Waste",y="Average Tons of Waste in Hennepin County")
+
+#Ramsey County
+WasteRamsey<-WasteLocalRL%>%filter(County == "Ramsey")
+t.test(Tons~Type, data=WasteRamsey, alternative = "two.sided", paired=TRUE)
+
+WasteRamsey%>%
+  group_by(Type)%>%
+  summarize(aveTons=mean(Tons),seTons=sd(Tons)/sqrt(length(Tons)),tstar=qt(0.95,length(Tons)-1))%>%
+  ggplot(aes(x=Type,y=aveTons))+geom_bar(stat="identity",fill="blue")+geom_errorbar(aes(ymin=aveTons-seTons*tstar,ymax=aveTons+seTons*tstar),) +labs(x="Type of Waste",y="Average Tons of Waste in Ramsey County")
+
+#Dakota County
+WasteDakota<-WasteLocalRL%>%filter(County == "Dakota")
+t.test(Tons~Type, data=WasteDakota, alternative = "two.sided", paired=TRUE)
+
+WasteDakota%>%
+  group_by(Type)%>%
+  summarize(aveTons=mean(Tons),seTons=sd(Tons)/sqrt(length(Tons)),tstar=qt(0.95,length(Tons)-1))%>%
+  ggplot(aes(x=Type,y=aveTons))+geom_bar(stat="identity",fill="red")+geom_errorbar(aes(ymin=aveTons-seTons*tstar,ymax=aveTons+seTons*tstar))+labs(x="Type of Waste",y="Average Tons of Waste in Dakota County")
+
+#The two types of waste are significantly different only in Dakota County (p < 0.0001)
+```
+
+```{r}
+#Question 2: "Is the mean amount of organics recycling significantly different for Hennepin, Ramsey, and Dakota Counties for the years 2013 through 2017?"
+
+#Call needed libraries: 
+library(tidyverse)
+library(nlme)
+library(multcomp)
+
+#Filter data to only include Hennepin, Ramsey, and Dakota counties and years 2013-2017
+WasteRecent<-Wastedata2%>%filter(Year=="2013" | Year=="2014" | Year=="2015" | Year=="2016" | Year== "2017")
+WasteLocalRecent<-WasteRecent%>%filter(County=="Hennepin" | County=="Ramsey" | County=="Dakota")
+
+#Perform One-Way Repeated Measures ANOVA analysis
+Model=lme(Organics~County, random=~1 | Year, data = WasteLocalRecent)
+anova(Model)
+
+#The p-value is 0.0839 > 0.05, so the mean organic recycling from 2013 to 2017 is not significantly different between Hennepin, Ramsey, and Dakota counties.
+
+WasteLocalRecent%>%
+  group_by(County)%>%
+  summarize(aveOrg=mean(Organics),seOrg=sd(Organics)/sqrt(length(Organics)),tstar=qt(0.95,length(Organics)-1))%>%
+  ggplot(aes(x=County,y=aveOrg))+geom_bar(stat="identity",fill="green")+geom_errorbar(aes(ymin=aveOrg-seOrg*tstar,ymax=aveOrg+seOrg*tstar))+labs(x="County",y="Average Organics Recycling for 2013-2017")
+```
+
